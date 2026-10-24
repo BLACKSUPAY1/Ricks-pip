@@ -1,0 +1,646 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RiskPip - Paso 5</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 16px 16px 40px; font-family: system-ui, sans-serif; background: #0b1220; color: #e6edf7; }
+  h1 { font-size: 20px; margin: 0 0 12px; }
+  h2 { font-size: 16px; margin: 24px 0 10px; }
+  .tabs { display: flex; gap: 8px; margin-bottom: 16px; }
+  .tab { flex: 1; padding: 10px; text-align: center; border-radius: 8px; background: #121b2e; border: 1px solid #2a3a57; color: #8aa0bd; font-size: 15px; font-weight: 600; cursor: pointer; width: auto; margin: 0; }
+  .tab.activa { background: #2563eb; border-color: #2563eb; color: #fff; }
+  .vista { display: none; }
+  .vista.activa { display: block; }
+  #estado { font-size: 14px; padding: 8px 12px; border-radius: 8px; background: #1a2438; display: inline-block; margin-bottom: 16px; }
+  #estado.ok { background: #12351f; color: #5eea8a; }
+  #estado.mal { background: #3a1616; color: #ff8a8a; }
+  select, input, button { width: 100%; padding: 12px; font-size: 16px; border-radius: 8px; border: 1px solid #2a3a57; background: #121b2e; color: #e6edf7; margin-bottom: 10px; }
+  button { background: #2563eb; border-color: #2563eb; font-weight: 600; cursor: pointer; }
+  button.sec { background: #121b2e; border-color: #2a3a57; font-weight: 500; }
+  #precio { font-size: 40px; font-weight: 700; margin-bottom: 4px; }
+  #moneda { color: #8aa0bd; margin-bottom: 8px; }
+  #mensaje, #mensajeOp { font-size: 14px; min-height: 20px; color: #ffcf6b; margin-bottom: 6px; }
+  #aviso { display: none; padding: 14px; border-radius: 10px; background: #12351f; color: #5eea8a; font-weight: 600; margin-bottom: 16px; }
+  ul { list-style: none; padding: 0; margin: 0; }
+  li { padding: 10px 0; border-bottom: 1px solid #1f2c45; display: flex; justify-content: space-between; align-items: center; gap: 10px; font-size: 15px; }
+  li .info small { display: block; color: #8aa0bd; font-size: 12px; margin-top: 2px; }
+  li.hecha { opacity: .6; }
+  li button { width: auto; padding: 6px 12px; margin: 0; font-size: 14px; background: #3a1616; border-color: #5a2222; font-weight: 500; }
+  .vacio { color: #8aa0bd; font-size: 14px; padding: 8px 0; }
+
+  .resumen { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 8px; }
+  .caja { background: #121b2e; border: 1px solid #1f2c45; border-radius: 10px; padding: 12px; }
+  .caja small { color: #8aa0bd; font-size: 12px; display: block; margin-bottom: 4px; }
+  .caja b { font-size: 20px; }
+  .caja.ancha { grid-column: 1 / 3; }
+  .caja.ancha b { font-size: 28px; }
+  .pos { color: #5eea8a; }
+  .neg { color: #ff8a8a; }
+  .botones { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .botones button { margin-bottom: 10px; background: #121b2e; border-color: #2a3a57; font-weight: 600; }
+  .botones button.gane.sel { background: #12351f; border-color: #5eea8a; color: #5eea8a; }
+  .botones button.perdi.sel { background: #3a1616; border-color: #ff8a8a; color: #ff8a8a; }
+  .monto-op { font-weight: 700; white-space: nowrap; }
+
+  .alerta-tilt { display: none; padding: 14px; border-radius: 10px; background: #3a1616; border: 1px solid #ff8a8a; color: #ff8a8a; font-weight: 700; margin-bottom: 12px; }
+  .barra { height: 10px; background: #1f2c45; border-radius: 6px; overflow: hidden; margin: 6px 0 4px; }
+  .barra div { height: 100%; width: 0; background: #5eea8a; transition: width .3s, background .3s; }
+  .fila-ajustes { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .et { color: #8aa0bd; font-size: 12px; display: block; margin-bottom: 4px; }
+  .resp { display: none; padding: 12px; border-radius: 10px; background: #121b2e; border: 1px solid #2a3a57; margin-bottom: 10px; font-size: 15px; line-height: 1.4; }
+  .resp.ok { border-color: #5eea8a; color: #5eea8a; }
+  .resp.aviso { border-color: #ffcf6b; color: #ffcf6b; }
+  .resp.stop { border-color: #ff8a8a; color: #ff8a8a; }
+  .tag-fuera { color: #ffcf6b; }
+</style>
+</head>
+<body>
+  <h1>RiskPip · Paso 5</h1>
+
+  <div class="tabs">
+    <button class="tab activa" data-vista="mercado">Mercado</button>
+    <button class="tab" data-vista="diario">Diario</button>
+  </div>
+
+  <!-- ================= MERCADO ================= -->
+  <div id="vista-mercado" class="vista activa">
+    <div id="estado">Conectando…</div>
+    <div id="aviso"></div>
+
+    <select id="selector">
+      <option value="BTCUSDT">BTC / USDT</option>
+      <option value="ETHUSDT">ETH / USDT</option>
+      <option value="SOLUSDT">SOL / USDT</option>
+      <option value="BNBUSDT">BNB / USDT</option>
+    </select>
+
+    <div id="precio">—</div>
+    <div id="moneda">BTC / USDT</div>
+
+    <h2>Nueva alerta</h2>
+    <select id="condicion">
+      <option value="sube">Avisar cuando SUBA a…</option>
+      <option value="baja">Avisar cuando BAJE a…</option>
+    </select>
+    <input id="objetivo" type="number" inputmode="decimal" step="any" placeholder="Precio objetivo">
+    <div id="mensaje"></div>
+    <button id="crear">Crear alerta</button>
+    <button id="permiso" class="sec">Activar avisos del teléfono</button>
+
+    <h2>Mis alertas</h2>
+    <ul id="lista"></ul>
+  </div>
+
+  <!-- ================= DIARIO ================= -->
+  <div id="vista-diario" class="vista">
+    <h2 style="margin-top:0">Hoy</h2>
+    <div id="alertaTilt" class="alerta-tilt"></div>
+    <div class="caja" style="margin-bottom:10px">
+      <small>Riesgo del día (pérdida neta frente a tu límite)</small>
+      <div class="barra"><div id="barraRiesgo"></div></div>
+      <small id="textoRiesgo" style="margin:0">Sin límite definido</small>
+    </div>
+    <div class="resumen">
+      <div class="caja ancha"><small>Balance del día</small><b id="rBalance">0.00</b></div>
+      <div class="caja"><small>Ganado</small><b id="rGanado" class="pos">0.00</b></div>
+      <div class="caja"><small>Perdido</small><b id="rPerdido" class="neg">0.00</b></div>
+      <div class="caja"><small>Operaciones</small><b id="rOps">0</b></div>
+      <div class="caja"><small>% de aciertos</small><b id="rAciertos">—</b></div>
+      <div class="caja ancha"><small>Racha actual</small><b id="rRacha">—</b></div>
+      <div class="caja ancha"><small>Operaciones fuera de plan hoy</small><b id="rFuera">0</b></div>
+    </div>
+
+    <h2>Mi plan (anti-tilt)</h2>
+    <div class="fila-ajustes">
+      <div>
+        <label class="et" for="ajLimite">Límite de pérdida diaria ($)</label>
+        <input id="ajLimite" type="number" inputmode="decimal" step="any" min="0" placeholder="Ej. 20">
+      </div>
+      <div>
+        <label class="et" for="ajRacha">Máx. pérdidas seguidas</label>
+        <input id="ajRacha" type="number" inputmode="numeric" step="1" min="0" placeholder="Ej. 3">
+      </div>
+    </div>
+    <button id="guardarAjustes" class="sec">Guardar mi plan</button>
+    <div id="mensajeAj" style="font-size:14px;min-height:20px;color:#ffcf6b;margin-bottom:6px"></div>
+
+    <button id="voyOperar" class="sec">Voy a operar</button>
+    <div id="respuestaOperar" class="resp"></div>
+    <div id="preguntaOperar" class="botones" style="display:none">
+      <button id="siPlan" type="button">Sigo mi plan</button>
+      <button id="siRecuperar" type="button">Quiero recuperar</button>
+    </div>
+
+    <h2>Registrar operación</h2>
+    <input id="opActivo" list="listaActivos" placeholder="Activo (ej. Vol 100, BTC)" autocomplete="off">
+    <datalist id="listaActivos"></datalist>
+    <div class="botones">
+      <button id="btnGane" class="gane" type="button">Gané</button>
+      <button id="btnPerdi" class="perdi" type="button">Perdí</button>
+    </div>
+    <input id="opMonto" type="number" inputmode="decimal" step="any" placeholder="Monto">
+    <div id="mensajeOp"></div>
+    <button id="guardarOp">Guardar operación</button>
+
+    <h2>Historial</h2>
+    <ul id="historial"></ul>
+  </div>
+
+<script>
+  /* ================= UTILIDADES ================= */
+  function formatear(n) {
+    return n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 6 });
+  }
+  function dinero(n) {
+    return n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+  function leer(clave, defecto) {
+    try {
+      var v = localStorage.getItem(clave);
+      return v === null ? defecto : JSON.parse(v);
+    } catch (e) { return defecto; }
+  }
+  function escribir(clave, valor) {
+    try { localStorage.setItem(clave, JSON.stringify(valor)); } catch (e) {}
+  }
+  function claveDia(fecha) {
+    var y = fecha.getFullYear();
+    var m = ("0" + (fecha.getMonth() + 1)).slice(-2);
+    var d = ("0" + fecha.getDate()).slice(-2);
+    return y + "-" + m + "-" + d;
+  }
+
+  var audio = null;
+  function sonar() {
+    try {
+      if (!audio) { audio = new (window.AudioContext || window.webkitAudioContext)(); }
+      if (audio.state === "suspended") { audio.resume(); }
+      var osc = audio.createOscillator();
+      var gan = audio.createGain();
+      osc.type = "sine";
+      osc.frequency.value = 880;
+      gan.gain.value = 0.2;
+      osc.connect(gan);
+      gan.connect(audio.destination);
+      osc.start();
+      osc.stop(audio.currentTime + 0.6);
+    } catch (e) {}
+  }
+
+  /* ================= PESTAÑAS ================= */
+  var tabs = document.querySelectorAll(".tab");
+  tabs.forEach(function (t) {
+    t.addEventListener("click", function () {
+      tabs.forEach(function (x) { x.classList.remove("activa"); });
+      document.querySelectorAll(".vista").forEach(function (v) { v.classList.remove("activa"); });
+      t.classList.add("activa");
+      document.getElementById("vista-" + t.getAttribute("data-vista")).classList.add("activa");
+    });
+  });
+
+  /* ================= MERCADO Y ALERTAS ================= */
+  var PARES = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT"];
+  var NOMBRES = { BTCUSDT: "BTC / USDT", ETHUSDT: "ETH / USDT", SOLUSDT: "SOL / USDT", BNBUSDT: "BNB / USDT" };
+  var CLAVE_ALERTAS = "riskpip_alertas";
+
+  var elEstado = document.getElementById("estado");
+  var elAviso = document.getElementById("aviso");
+  var elSelector = document.getElementById("selector");
+  var elPrecio = document.getElementById("precio");
+  var elMoneda = document.getElementById("moneda");
+  var elCondicion = document.getElementById("condicion");
+  var elObjetivo = document.getElementById("objetivo");
+  var elMensaje = document.getElementById("mensaje");
+  var elLista = document.getElementById("lista");
+
+  var precios = {};
+  var alertas = leer(CLAVE_ALERTAS, []);
+  var socket = null;
+  var reintento = null;
+
+  function avisar(texto) {
+    elAviso.textContent = texto;
+    elAviso.style.display = "block";
+    sonar();
+    try { if (navigator.vibrate) { navigator.vibrate([300, 150, 300]); } } catch (e) {}
+    try {
+      if ("Notification" in window && Notification.permission === "granted") {
+        new Notification("RiskPip", { body: texto });
+      }
+    } catch (e) {}
+  }
+
+  document.getElementById("permiso").addEventListener("click", function () {
+    sonar();
+    if (!("Notification" in window)) {
+      elMensaje.textContent = "Este navegador no permite avisos. Verás el aviso dentro de la página.";
+      return;
+    }
+    Notification.requestPermission().then(function (r) {
+      elMensaje.textContent = r === "granted"
+        ? "Avisos del teléfono activados."
+        : "No se activaron los avisos. Verás el aviso dentro de la página.";
+    });
+  });
+
+  function revisar(par, precio) {
+    var cambio = false;
+    alertas.forEach(function (a) {
+      if (!a.activa || a.par !== par) { return; }
+      var cumple = (a.condicion === "sube" && precio >= a.objetivo) ||
+                   (a.condicion === "baja" && precio <= a.objetivo);
+      if (cumple) {
+        a.activa = false;
+        a.hora = new Date().toLocaleTimeString("es-DO");
+        cambio = true;
+        avisar(NOMBRES[par] + " llegó a " + formatear(precio) + " (alerta: " + formatear(a.objetivo) + ")");
+      }
+    });
+    if (cambio) { escribir(CLAVE_ALERTAS, alertas); dibujarAlertas(); }
+  }
+
+  document.getElementById("crear").addEventListener("click", function () {
+    sonar();
+    var par = elSelector.value;
+    var objetivo = parseFloat(elObjetivo.value);
+    var condicion = elCondicion.value;
+    var actual = precios[par];
+    elMensaje.textContent = "";
+
+    if (!isFinite(objetivo) || objetivo <= 0) {
+      elMensaje.textContent = "Escribe un precio objetivo válido.";
+      return;
+    }
+    if (actual === undefined) {
+      elMensaje.textContent = "Espera a que cargue el precio actual.";
+      return;
+    }
+    if ((condicion === "sube" && actual >= objetivo) || (condicion === "baja" && actual <= objetivo)) {
+      elMensaje.textContent = "El precio actual (" + formatear(actual) + ") ya cumple esa condición. Elige otro precio.";
+      return;
+    }
+    alertas.push({ id: Date.now(), par: par, condicion: condicion, objetivo: objetivo, activa: true, hora: "" });
+    escribir(CLAVE_ALERTAS, alertas);
+    elObjetivo.value = "";
+    dibujarAlertas();
+  });
+
+  function dibujarAlertas() {
+    elLista.innerHTML = "";
+    if (alertas.length === 0) {
+      var vacio = document.createElement("div");
+      vacio.className = "vacio";
+      vacio.textContent = "Todavía no tienes alertas.";
+      elLista.appendChild(vacio);
+      return;
+    }
+    alertas.slice().reverse().forEach(function (a) {
+      var li = document.createElement("li");
+      if (!a.activa) { li.className = "hecha"; }
+
+      var info = document.createElement("div");
+      info.className = "info";
+      var linea = document.createElement("div");
+      linea.textContent = NOMBRES[a.par] + " " + (a.condicion === "sube" ? "sube a " : "baja a ") + formatear(a.objetivo);
+      var estado = document.createElement("small");
+      estado.textContent = a.activa ? "Activa" : "Se cumplió a las " + a.hora;
+      info.appendChild(linea);
+      info.appendChild(estado);
+
+      var borrar = document.createElement("button");
+      borrar.textContent = "Borrar";
+      borrar.addEventListener("click", function () {
+        alertas = alertas.filter(function (x) { return x.id !== a.id; });
+        escribir(CLAVE_ALERTAS, alertas);
+        dibujarAlertas();
+      });
+
+      li.appendChild(info);
+      li.appendChild(borrar);
+      elLista.appendChild(li);
+    });
+  }
+
+  function mostrarSeleccionado() {
+    var par = elSelector.value;
+    elMoneda.textContent = NOMBRES[par];
+    elPrecio.textContent = precios[par] !== undefined ? formatear(precios[par]) : "—";
+  }
+
+  function conectar() {
+    clearTimeout(reintento);
+    if (socket) { socket.onclose = null; socket.close(); }
+
+    elEstado.textContent = "Conectando…";
+    elEstado.className = "";
+
+    var flujos = PARES.map(function (p) { return p.toLowerCase() + "@trade"; }).join("/");
+    socket = new WebSocket("wss://stream.binance.com:9443/stream?streams=" + flujos);
+
+    socket.onopen = function () {
+      elEstado.textContent = "Conectado a Binance";
+      elEstado.className = "ok";
+    };
+
+    socket.onmessage = function (evento) {
+      var msg = JSON.parse(evento.data);
+      var d = msg.data;
+      if (!d || !d.s) { return; }
+      var precio = parseFloat(d.p);
+      precios[d.s] = precio;
+      if (d.s === elSelector.value) { elPrecio.textContent = formatear(precio); }
+      revisar(d.s, precio);
+    };
+
+    socket.onerror = function () {
+      elEstado.textContent = "Error de conexión (puede ser bloqueo por región o internet)";
+      elEstado.className = "mal";
+    };
+
+    socket.onclose = function () {
+      elEstado.textContent = "Desconectado, reintentando…";
+      elEstado.className = "mal";
+      reintento = setTimeout(conectar, 3000);
+    };
+  }
+
+  elSelector.addEventListener("change", mostrarSeleccionado);
+  elAviso.addEventListener("click", function () { elAviso.style.display = "none"; });
+
+  /* ================= DIARIO DE OPERACIONES ================= */
+  var CLAVE_OPS = "riskpip_operaciones";
+  var CLAVE_ULTIMO = "riskpip_ultimo_activo";
+
+  var operaciones = leer(CLAVE_OPS, []);
+  var resultadoSel = "";
+
+  var elOpActivo = document.getElementById("opActivo");
+  var elOpMonto = document.getElementById("opMonto");
+  var elMensajeOp = document.getElementById("mensajeOp");
+  var btnGane = document.getElementById("btnGane");
+  var btnPerdi = document.getElementById("btnPerdi");
+  var elHistorial = document.getElementById("historial");
+  var elListaActivos = document.getElementById("listaActivos");
+
+  elOpActivo.value = leer(CLAVE_ULTIMO, "");
+
+  function elegir(res) {
+    resultadoSel = res;
+    btnGane.className = "gane" + (res === "gane" ? " sel" : "");
+    btnPerdi.className = "perdi" + (res === "perdi" ? " sel" : "");
+  }
+  btnGane.addEventListener("click", function () { elegir("gane"); });
+  btnPerdi.addEventListener("click", function () { elegir("perdi"); });
+
+  document.getElementById("guardarOp").addEventListener("click", function () {
+    elMensajeOp.textContent = "";
+    var activo = elOpActivo.value.trim();
+    var monto = parseFloat(elOpMonto.value);
+
+    if (!activo) { elMensajeOp.textContent = "Escribe el activo."; return; }
+    if (!resultadoSel) { elMensajeOp.textContent = "Elige si ganaste o perdiste."; return; }
+    if (!isFinite(monto) || monto <= 0) { elMensajeOp.textContent = "Escribe un monto mayor que cero."; return; }
+
+    var ahora = new Date();
+    var antes = estadoDia();
+    operaciones.push({
+      id: ahora.getTime(),
+      dia: claveDia(ahora),
+      hora: ahora.toLocaleTimeString("es-DO", { hour: "2-digit", minute: "2-digit" }),
+      activo: activo,
+      resultado: resultadoSel,
+      monto: monto,
+      fuera: antes.parado
+    });
+    escribir(CLAVE_OPS, operaciones);
+    escribir(CLAVE_ULTIMO, activo);
+
+    elOpMonto.value = "";
+    elegir("");
+    dibujarDiario();
+
+    var despues = estadoDia();
+    if (!antes.parado && despues.parado) {
+      sonar();
+      try { if (navigator.vibrate) { navigator.vibrate([500, 200, 500, 200, 500]); } } catch (e) {}
+      try {
+        if ("Notification" in window && Notification.permission === "granted") {
+          new Notification("RiskPip", { body: "Llegaste a tu límite. Para por hoy." });
+        }
+      } catch (e) {}
+    } else if (antes.parado) {
+      elMensajeOp.textContent = "Guardada como fuera de plan: ya habías llegado a tu límite.";
+    }
+  });
+
+  /* ================= ANTI-TILT ================= */
+  var CLAVE_AJUSTES = "riskpip_ajustes";
+  var ajustes = leer(CLAVE_AJUSTES, { limite: 0, maxRacha: 0 });
+  var elAjLimite = document.getElementById("ajLimite");
+  var elAjRacha = document.getElementById("ajRacha");
+  var elMensajeAj = document.getElementById("mensajeAj");
+
+  if (ajustes.limite > 0) { elAjLimite.value = ajustes.limite; }
+  if (ajustes.maxRacha > 0) { elAjRacha.value = ajustes.maxRacha; }
+
+  document.getElementById("guardarAjustes").addEventListener("click", function () {
+    var limite = elAjLimite.value === "" ? 0 : parseFloat(elAjLimite.value);
+    var racha = elAjRacha.value === "" ? 0 : parseInt(elAjRacha.value, 10);
+    if (!isFinite(limite) || limite < 0 || !isFinite(racha) || racha < 0) {
+      elMensajeAj.textContent = "Escribe números válidos (o déjalos vacíos para no usar ese límite).";
+      return;
+    }
+    ajustes = { limite: limite, maxRacha: racha };
+    escribir(CLAVE_AJUSTES, ajustes);
+    elMensajeAj.textContent = "Plan guardado.";
+    dibujarDiario();
+  });
+
+  /* Recorre las operaciones del día en orden. Una vez que se alcanza un límite,
+     el bloqueo queda fijo el resto del día (aunque luego se gane). */
+  function estadoDia() {
+    var hoy = claveDia(new Date());
+    var deHoy = operaciones.filter(function (o) { return o.dia === hoy; });
+
+    var neto = 0, racha = 0, parado = false, motivo = "";
+    deHoy.forEach(function (o) {
+      if (o.resultado === "gane") { neto += o.monto; racha = 0; }
+      else { neto -= o.monto; racha++; }
+      if (!parado) {
+        var perdida = neto < 0 ? -neto : 0;
+        var porLimite = ajustes.limite > 0 && perdida >= ajustes.limite;
+        var porRacha = ajustes.maxRacha > 0 && racha >= ajustes.maxRacha;
+        if (porLimite && porRacha) { motivo = "perdiste " + dinero(perdida) + " y llevas " + racha + " pérdidas seguidas"; }
+        else if (porLimite) { motivo = "perdiste " + dinero(perdida) + " hoy (tu límite es " + dinero(ajustes.limite) + ")"; }
+        else if (porRacha) { motivo = "llevas " + racha + " pérdidas seguidas (tu máximo es " + ajustes.maxRacha + ")"; }
+        if (porLimite || porRacha) { parado = true; }
+      }
+    });
+
+    return { deHoy: deHoy, perdidaNeta: neto < 0 ? -neto : 0, rachaPerdidas: racha, parado: parado, motivo: motivo };
+  }
+
+  function dibujarAntiTilt() {
+    var e = estadoDia();
+    var elAlerta = document.getElementById("alertaTilt");
+    var barra = document.getElementById("barraRiesgo");
+    var texto = document.getElementById("textoRiesgo");
+
+    if (e.parado) {
+      elAlerta.textContent = "Llegaste a tu límite: " + e.motivo + ". Para por hoy.";
+      elAlerta.style.display = "block";
+    } else {
+      elAlerta.style.display = "none";
+    }
+
+    if (ajustes.limite > 0) {
+      var pct = Math.min(100, (e.perdidaNeta / ajustes.limite) * 100);
+      barra.style.width = pct + "%";
+      barra.style.background = pct >= 80 ? "#ff8a8a" : pct >= 50 ? "#ffcf6b" : "#5eea8a";
+      texto.textContent = "Llevas " + dinero(e.perdidaNeta) + " de " + dinero(ajustes.limite) + " (" + Math.round(pct) + "%)";
+    } else {
+      barra.style.width = "0%";
+      texto.textContent = "Sin límite definido. Escríbelo en \"Mi plan\".";
+    }
+
+    var fuera = e.deHoy.filter(function (o) { return o.fuera; });
+    var neto = 0;
+    fuera.forEach(function (o) { neto += o.resultado === "gane" ? o.monto : -o.monto; });
+    var elFuera = document.getElementById("rFuera");
+    elFuera.textContent = fuera.length + (fuera.length ? " (" + (neto >= 0 ? "+" : "-") + dinero(Math.abs(neto)) + ")" : "");
+    elFuera.className = fuera.length ? (neto >= 0 ? "pos" : "neg") : "";
+  }
+
+  var elResp = document.getElementById("respuestaOperar");
+  var elPregunta = document.getElementById("preguntaOperar");
+
+  function responder(clase, texto) {
+    elResp.className = "resp " + clase;
+    elResp.textContent = texto;
+    elResp.style.display = "block";
+  }
+
+  document.getElementById("voyOperar").addEventListener("click", function () {
+    sonar();
+    var e = estadoDia();
+    if (e.parado) {
+      elPregunta.style.display = "none";
+      responder("stop", "Ya llegaste a tu límite hoy: " + e.motivo + ". Lo mejor es parar y volver mañana.");
+      return;
+    }
+    elResp.style.display = "none";
+    elPregunta.style.display = "grid";
+  });
+
+  document.getElementById("siPlan").addEventListener("click", function () {
+    elPregunta.style.display = "none";
+    responder("ok", "Bien. Opera solo lo que dice tu plan, con el monto que ya decidiste.");
+  });
+
+  document.getElementById("siRecuperar").addEventListener("click", function () {
+    elPregunta.style.display = "none";
+    var e = estadoDia();
+    if (e.perdidaNeta > 0) {
+      responder("aviso", "Ojo: hoy llevas " + dinero(e.perdidaNeta) + " de pérdida neta. Operar para recuperar suele agrandar la pérdida. Respira 5 minutos antes de decidir.");
+    } else {
+      responder("ok", "Hoy no llevas pérdida neta, así que no hay nada que recuperar. Sigue tu plan.");
+    }
+  });
+
+  function dibujarDiario() {
+    var hoy = claveDia(new Date());
+    var deHoy = operaciones.filter(function (o) { return o.dia === hoy; });
+
+    var ganado = 0, perdido = 0, ganadas = 0;
+    deHoy.forEach(function (o) {
+      if (o.resultado === "gane") { ganado += o.monto; ganadas++; }
+      else { perdido += o.monto; }
+    });
+    var balance = ganado - perdido;
+
+    var rBalance = document.getElementById("rBalance");
+    rBalance.textContent = (balance > 0 ? "+" : balance < 0 ? "-" : "") + dinero(Math.abs(balance));
+    rBalance.className = balance > 0 ? "pos" : balance < 0 ? "neg" : "";
+    document.getElementById("rGanado").textContent = dinero(ganado);
+    document.getElementById("rPerdido").textContent = dinero(perdido);
+    document.getElementById("rOps").textContent = deHoy.length;
+    document.getElementById("rAciertos").textContent =
+      deHoy.length ? Math.round((ganadas / deHoy.length) * 100) + "%" : "—";
+
+    var rRacha = document.getElementById("rRacha");
+    if (deHoy.length === 0) {
+      rRacha.textContent = "—";
+      rRacha.className = "";
+    } else {
+      var ultima = deHoy[deHoy.length - 1].resultado;
+      var n = 0;
+      for (var i = deHoy.length - 1; i >= 0 && deHoy[i].resultado === ultima; i--) { n++; }
+      rRacha.textContent = n + (ultima === "gane" ? (n === 1 ? " ganada" : " ganadas seguidas") : (n === 1 ? " perdida" : " perdidas seguidas"));
+      rRacha.className = ultima === "gane" ? "pos" : "neg";
+    }
+
+    /* sugerencias de activos usados antes */
+    var vistos = {};
+    elListaActivos.innerHTML = "";
+    operaciones.slice().reverse().forEach(function (o) {
+      if (vistos[o.activo]) { return; }
+      vistos[o.activo] = true;
+      var op = document.createElement("option");
+      op.value = o.activo;
+      elListaActivos.appendChild(op);
+    });
+
+    dibujarAntiTilt();
+
+    /* historial */
+    elHistorial.innerHTML = "";
+    if (operaciones.length === 0) {
+      var vacio = document.createElement("div");
+      vacio.className = "vacio";
+      vacio.textContent = "Todavía no tienes operaciones registradas.";
+      elHistorial.appendChild(vacio);
+      return;
+    }
+    operaciones.slice().reverse().slice(0, 50).forEach(function (o) {
+      var li = document.createElement("li");
+
+      var info = document.createElement("div");
+      info.className = "info";
+      var linea = document.createElement("div");
+      linea.textContent = o.activo;
+      var sub = document.createElement("small");
+      sub.textContent = (o.dia === hoy ? "Hoy" : o.dia) + " · " + o.hora + (o.fuera ? " · fuera de plan" : "");
+      if (o.fuera) { sub.className = "tag-fuera"; }
+      info.appendChild(linea);
+      info.appendChild(sub);
+
+      var monto = document.createElement("div");
+      monto.className = "monto-op " + (o.resultado === "gane" ? "pos" : "neg");
+      monto.textContent = (o.resultado === "gane" ? "+" : "-") + dinero(o.monto);
+
+      var borrar = document.createElement("button");
+      borrar.textContent = "Borrar";
+      borrar.addEventListener("click", function () {
+        operaciones = operaciones.filter(function (x) { return x.id !== o.id; });
+        escribir(CLAVE_OPS, operaciones);
+        dibujarDiario();
+      });
+
+      li.appendChild(info);
+      li.appendChild(monto);
+      li.appendChild(borrar);
+      elHistorial.appendChild(li);
+    });
+  }
+
+  /* ================= INICIO ================= */
+  dibujarAlertas();
+  dibujarDiario();
+  conectar();
+</script>
+</body>
+</html>
