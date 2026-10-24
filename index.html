@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RiskPip - Paso 1</title>
+<style>
+  :root { color-scheme: dark; }
+  body { margin: 0; padding: 20px 16px; font-family: system-ui, sans-serif; background: #0b1220; color: #e6edf7; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  .sub { color: #8aa0bd; font-size: 14px; margin-bottom: 16px; }
+  #estado { font-size: 14px; padding: 8px 12px; border-radius: 8px; background: #1a2438; display: inline-block; margin-bottom: 16px; }
+  #estado.ok { background: #12351f; color: #5eea8a; }
+  #estado.mal { background: #3a1616; color: #ff8a8a; }
+  select { width: 100%; padding: 12px; font-size: 16px; border-radius: 8px; border: 1px solid #2a3a57; background: #121b2e; color: #e6edf7; margin-bottom: 16px; }
+  #precio { font-size: 40px; font-weight: 700; margin-bottom: 4px; }
+  #moneda { color: #8aa0bd; margin-bottom: 20px; }
+  ul { list-style: none; padding: 0; margin: 0; }
+  li { padding: 8px 0; border-bottom: 1px solid #1f2c45; display: flex; justify-content: space-between; font-size: 15px; }
+  li span:first-child { color: #8aa0bd; }
+</style>
+</head>
+<body>
+  <h1>RiskPip · Paso 1</h1>
+  <div class="sub">Prueba de conexión en vivo con Binance</div>
+
+  <div id="estado">Conectando…</div>
+
+  <select id="selector">
+    <option value="BTCUSDT">BTC / USDT</option>
+    <option value="ETHUSDT">ETH / USDT</option>
+    <option value="SOLUSDT">SOL / USDT</option>
+    <option value="BNBUSDT">BNB / USDT</option>
+  </select>
+
+  <div id="precio">—</div>
+  <div id="moneda">USDT</div>
+
+  <ul id="registro"></ul>
+
+<script>
+  var elEstado = document.getElementById("estado");
+  var elPrecio = document.getElementById("precio");
+  var elMoneda = document.getElementById("moneda");
+  var elRegistro = document.getElementById("registro");
+  var elSelector = document.getElementById("selector");
+
+  var socket = null;
+  var ultimoRegistro = 0;
+  var reintento = null;
+
+  function formatear(n) {
+    return n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 6 });
+  }
+
+  function conectar() {
+    var par = elSelector.value;
+    clearTimeout(reintento);
+
+    if (socket) {
+      socket.onclose = null;
+      socket.close();
+    }
+
+    elEstado.textContent = "Conectando…";
+    elEstado.className = "";
+    elPrecio.textContent = "—";
+    elRegistro.innerHTML = "";
+    elMoneda.textContent = par.replace("USDT", " / USDT");
+
+    socket = new WebSocket("wss://stream.binance.com:9443/ws/" + par.toLowerCase() + "@trade");
+
+    socket.onopen = function () {
+      elEstado.textContent = "Conectado a Binance";
+      elEstado.className = "ok";
+    };
+
+    socket.onmessage = function (evento) {
+      var datos = JSON.parse(evento.data);
+      var precio = parseFloat(datos.p);
+      elPrecio.textContent = formatear(precio);
+
+      var ahora = Date.now();
+      if (ahora - ultimoRegistro >= 1000) {
+        ultimoRegistro = ahora;
+        var li = document.createElement("li");
+        var hora = new Date(ahora).toLocaleTimeString("es-DO");
+        li.innerHTML = "<span>" + hora + "</span><span>" + formatear(precio) + "</span>";
+        elRegistro.insertBefore(li, elRegistro.firstChild);
+        while (elRegistro.children.length > 8) {
+          elRegistro.removeChild(elRegistro.lastChild);
+        }
+      }
+    };
+
+    socket.onerror = function () {
+      elEstado.textContent = "Error de conexión (puede ser bloqueo por región o internet)";
+      elEstado.className = "mal";
+    };
+
+    socket.onclose = function () {
+      elEstado.textContent = "Desconectado, reintentando…";
+      elEstado.className = "mal";
+      reintento = setTimeout(conectar, 3000);
+    };
+  }
+
+  elSelector.addEventListener("change", conectar);
+  conectar();
+</script>
+</body>
+</html>
